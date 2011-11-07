@@ -31,9 +31,9 @@ class wt implements Watcher{
 	
 }//watcher
 
-
-
 public class counter extends Thread{
+	
+	
 
 	int id;
 	
@@ -57,7 +57,7 @@ public class counter extends Thread{
 		}
 		
 		
-		for(int i = 0 ; i < 10; i++){
+		for(int i = 0 ; i < 1000; i++){
 			System.out.println("instance " + id + " got id : "+ getSeqID(zk, remotePath));
 			
 		}//for
@@ -65,13 +65,44 @@ public class counter extends Thread{
 		
 	}
 	
-	
+	public static boolean mutexLock(ZooKeeper zk, String remotePath) throws InterruptedException{
+		
+		
+		while(true){
+			Stat s1;
+			try{
+				s1 = zk.exists(remotePath+"/mutex", null);
+			
+				String s2 = null;
+				if(s1 == null){
+					s2 = zk.create(remotePath+"/mutex", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+					
+					if(s2==null) continue;
+					System.out.println("got mutex");
+					return true;	
+				}
+				else{
+					
+					Thread.sleep(100);
+				}
+			
+			
+			}catch (KeeperException e){
+				continue;
+			}
+			
+		}
+	}
+	public static boolean mutexUnlock(ZooKeeper zk, String remotePath) throws InterruptedException, KeeperException{
+		zk.delete(remotePath+"/mutex", -1);
+		
+		return true;
+	}
 	
 	public static  int getSeqID(ZooKeeper zk, String remotePath){
 		
 		
 		int retval = 0;
-		String readLockPath = remotePath+"";
 		
 		
 		try {	
@@ -79,9 +110,12 @@ public class counter extends Thread{
 
 			if(s1!=null){
 			
-				
+				byte []fromServer = null;
 				//retrieve the date from server
-				byte []fromServer = zk.getData(remotePath, null, null);
+				mutexLock(zk, remotePath);
+				
+				fromServer = zk.getData(remotePath, null, null);
+					
 				String counterValue = new String(fromServer);
 				System.out.print("hearing back from server: " + counterValue + "\t");
 				retval = Integer.parseInt(counterValue);
@@ -95,7 +129,7 @@ public class counter extends Thread{
 				System.out.println("setting the data to " + setD);
 				
 					
-				
+				mutexUnlock(zk, remotePath);
 				//check if the data is set
 				//fromServer = zk.getData(remotePath, new wt(), null);
 				//counterValue = new String(fromServer);
@@ -106,7 +140,10 @@ public class counter extends Thread{
 			else{
 				String value = "0";
 				byte[] data = value.getBytes();
-				String remotePathSet = zk.create(remotePath, data, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				String remotePathSet = null;
+				mutexLock(zk, remotePath);
+				 remotePathSet = zk.create(remotePath, data, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				mutexUnlock(zk, remotePath);
 				System.out.println("znode is built: " + remotePathSet );
 			    
 				}
@@ -126,15 +163,16 @@ public class counter extends Thread{
 	public static void main(String [] a) throws InterruptedException{
 	
 		
-		Thread[] threads = new Thread[5];
+		Thread[] threads = new Thread[10];
 
 		for (int i = 0; i < threads.length; i++) {
 		    threads[i] = new counter(i);
 		    threads[i].start();
-		
+		   
 		    
-		     }
+		     }//for
 				
+		//350
 		}//main
 		
 	
